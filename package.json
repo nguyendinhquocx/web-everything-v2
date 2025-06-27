@@ -1,0 +1,14 @@
+{
+  "name": "everything-tool",
+  "version": "1.0.0",
+  "description": "Minimalist web tools for productivity",
+  "main": "index.html",
+  "scripts": {
+    "dev": "python -m http.server 8000",
+    "build": "echo 'Static files ready for deployment'",
+    "deploy": "firebase deploy"
+  },
+  "keywords": ["tools", "subtitle", "productivity"],
+  "author": "nguyendinhquocx",
+  "license": "MIT"
+}

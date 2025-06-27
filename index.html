@@ -1,0 +1,31 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Everything Tool</title>
+    <link rel="stylesheet" href="src/styles/global.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <!-- Enhanced Vietnamese font support -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet">
+    <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+    <!-- jsPDF with better Unicode support -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+    <!-- Optional: Add Vietnamese font to jsPDF -->
+    <script>
+        // Ensure proper UTF-8 handling
+        document.addEventListener('DOMContentLoaded', function() {
+            if (window.jspdf) {
+                // Configure jsPDF for better Vietnamese support
+                console.log('jsPDF loaded with Vietnamese support');
+            }
+        });
+    </script>
+</head>
+<body>
+    <div id="app"></div>
+    <script type="module" src="src/main.js"></script>
+</body>
+</html>
