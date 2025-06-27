@@ -1,16 +1,17 @@
 import { FileUploader } from '../components/common/FileUploader.js';
 import { NotificationManager } from '../components/common/NotificationManager.js';
 import { ConfigManager } from '../services/ConfigManager.js';
-import { VietnameseTextRenderer } from '../services/VietnameseTextRenderer.js';
 
 export class SubtitleProcessor {
+    static name = 'Subtitle Processor';
+    static id = 'subtitle-processor';
+
     constructor() {
-        this.notificationManager = new NotificationManager();
-        this.configManager = new ConfigManager();
-        this.textRenderer = new VietnameseTextRenderer();
-        this.processedText = '';
+        this.fileUploader = null;
+        this.notification = new NotificationManager();
+        this.config = new ConfigManager();
+        this.processedContent = '';
         this.originalFileName = '';
-        this.subtitleEntries = []; // Store parsed subtitle entries
     }
 
     mount(selector) {
@@ -20,104 +21,105 @@ export class SubtitleProcessor {
     }
 
     render() {
-        const config = this.configManager.get('subtitle');
-        
         this.container.innerHTML = `
             <div class="tool-content">
                 <div class="tool-header">
                     <h2>Subtitle Processor</h2>
-                    <p class="tool-description">Upload .srt or .txt files to clean and format subtitles</p>
+                    <p class="text-muted">Upload .srt or .txt files to clean and format subtitles</p>
                 </div>
 
-                <div class="upload-section">
-                    <div id="file-uploader"></div>
-                </div>
+                <div class="file-uploader-container" id="file-uploader"></div>
 
                 <div class="output-section">
                     <div class="section-header">
                         <h3>Output</h3>
-                        <div class="output-actions">
-                            <button class="btn-secondary" id="copy-btn">
-                                <i data-lucide="copy"></i> Copy
+                        <div class="actions" id="output-actions">
+                            <button class="btn btn-outline" id="copy-btn" disabled>
+                                <i data-lucide="copy"></i>
+                                Copy
                             </button>
-                            <button class="btn-secondary" id="download-txt-btn">
-                                <i data-lucide="download"></i> Download TXT
+                            <button class="btn btn-outline" id="download-txt-btn" disabled>
+                                <i data-lucide="download"></i>
+                                Download TXT
                             </button>
-                            <button class="btn-primary" id="download-pdf-btn">
-                                <i data-lucide="file-text"></i> Download PDF
+                            <button class="btn btn-primary" id="download-pdf-btn" disabled>
+                                <i data-lucide="file-text"></i>
+                                Download PDF
                             </button>
                         </div>
                     </div>
                     
-                    <textarea id="output-text" class="output-textarea" 
-                              placeholder="Upload a file to see the output here..." 
+                    <textarea class="output-textarea" 
+                              id="output-content" 
+                              placeholder="Upload a file to see the output here..."
                               readonly></textarea>
                 </div>
 
-                <!-- PDF Settings -->
-                <details class="settings-section">
-                    <summary class="settings-header">
-                        <i data-lucide="settings"></i> PDF Settings
-                    </summary>
-                    <div class="settings-content">
-                        <!-- Title Settings -->
-                        <div class="setting-group">
-                            <h4>Document Title</h4>
-                            <div class="setting-row">
-                                <label>
-                                    <input type="checkbox" id="show-title" ${config.showTitle ? 'checked' : ''}>
-                                    Show title on first page
-                                </label>
-                            </div>
-                            <div class="setting-row">
-                                <label for="doc-title">Title:</label>
-                                <input type="text" id="doc-title" value="${config.title || ''}" 
-                                       placeholder="Enter document title (optional)">
-                            </div>
-                        </div>
+                ${this.renderPDFSettings()}
+            </div>
 
-                        <!-- Layout Settings -->
-                        <div class="setting-group">
-                            <h4>Layout</h4>
-                            <div class="setting-row">
-                                <label for="pdf-columns">Columns:</label>
-                                <input type="range" id="pdf-columns" min="1" max="4" 
-                                       value="${config.pdfColumns || 3}">
-                                <span class="range-value">${config.pdfColumns || 3}</span>
-                            </div>
-                            <div class="setting-row">
-                                <label for="pdf-font-size">Font Size:</label>
-                                <input type="range" id="pdf-font-size" min="6" max="12" 
-                                       value="${config.pdfFontSize || 8}">
-                                <span class="range-value">${config.pdfFontSize || 8}pt</span>
-                            </div>
-                        </div>
-
-                        <!-- Content Settings -->
-                        <div class="setting-group">
-                            <h4>Content</h4>
-                            <div class="setting-row">
-                                <label>
-                                    <input type="checkbox" id="show-timestamps-pdf" 
-                                           ${!config.removeTimestampsInPDF ? 'checked' : ''}>
-                                    Show timestamps in PDF (recommended)
-                                </label>
-                            </div>
-                        </div>
-                    </div>
-                </details>
+            <!-- Hidden PDF Preview Container -->
+            <div id="pdf-preview-container" style="position: absolute; left: -9999px; top: -9999px;">
+                <!-- PDF content will be rendered here for html2canvas -->
             </div>
         `;
 
         this.initializeComponents();
-        this.updateUI();
+    }
+
+    renderPDFSettings() {
+        return `
+            <div class="settings-section collapsed" id="pdf-settings">
+                <div class="settings-header" id="settings-toggle">
+                    <i data-lucide="settings"></i>
+                    <span>PDF Settings</span>
+                    <i data-lucide="chevron-down" class="chevron"></i>
+                </div>
+                <div class="settings-content">
+                    <div class="setting-group">
+                        <label for="pdf-title">Document Title</label>
+                        <input type="text" id="pdf-title" placeholder="Enter document title..." 
+                               value="${this.config.get('subtitle.title') || ''}">
+                    </div>
+                    
+                    <div class="setting-row">
+                        <div class="setting-group">
+                            <label for="pdf-columns">Columns</label>
+                            <select id="pdf-columns">
+                                <option value="2" ${this.config.get('subtitle.columns') === 2 ? 'selected' : ''}>2 Columns</option>
+                                <option value="3" ${this.config.get('subtitle.columns') === 3 ? 'selected' : ''}>3 Columns</option>
+                                <option value="4" ${this.config.get('subtitle.columns') === 4 ? 'selected' : ''}>4 Columns</option>
+                            </select>
+                        </div>
+                        
+                        <div class="setting-group">
+                            <label for="pdf-font-size">Font Size</label>
+                            <select id="pdf-font-size">
+                                <option value="8" ${this.config.get('subtitle.fontSize') === 8 ? 'selected' : ''}>8px (Tiny)</option>
+                                <option value="9" ${this.config.get('subtitle.fontSize') === 9 ? 'selected' : ''}>9px (Small)</option>
+                                <option value="10" ${this.config.get('subtitle.fontSize') === 10 ? 'selected' : ''}>10px (Medium)</option>
+                                <option value="11" ${this.config.get('subtitle.fontSize') === 11 ? 'selected' : ''}>11px (Regular)</option>
+                            </select>
+                        </div>
+                    </div>
+
+                    <div class="setting-group">
+                        <label class="checkbox-label">
+                            <input type="checkbox" id="remove-timestamps" 
+                                   ${this.config.get('subtitle.removeTimestamps') ? 'checked' : ''}>
+                            <span>Remove timestamps from PDF</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+        `;
     }
 
     initializeComponents() {
         // Initialize file uploader
         this.fileUploader = new FileUploader({
             accept: '.srt,.txt',
-            onFileSelect: (file) => this.handleFileSelect(file)
+            onFileSelect: (file) => this.processFile(file)
         });
         this.fileUploader.mount('#file-uploader');
 
@@ -128,80 +130,70 @@ export class SubtitleProcessor {
     }
 
     bindEvents() {
-        // Output actions
-        document.getElementById('copy-btn').addEventListener('click', () => this.copyToClipboard());
-        document.getElementById('download-txt-btn').addEventListener('click', () => this.downloadTXT());
-        document.getElementById('download-pdf-btn').addEventListener('click', () => this.downloadPDF());
+        // Button events
+        const copyBtn = this.container.querySelector('#copy-btn');
+        const downloadTxtBtn = this.container.querySelector('#download-txt-btn');
+        const downloadPdfBtn = this.container.querySelector('#download-pdf-btn');
 
-        // Settings events
-        const settings = [
-            'pdf-columns', 'pdf-font-size', 'show-timestamps-pdf', 'show-title'
-        ];
+        copyBtn.addEventListener('click', () => this.copyContent());
+        downloadTxtBtn.addEventListener('click', () => this.downloadTXT());
+        downloadPdfBtn.addEventListener('click', () => this.downloadPDF());
+
+        // Settings toggle
+        const settingsToggle = this.container.querySelector('#settings-toggle');
+        const settingsSection = this.container.querySelector('#pdf-settings');
         
-        settings.forEach(id => {
-            const element = document.getElementById(id);
-            if (element) {
-                element.addEventListener('change', () => this.handleSettingChange(id, element));
-                element.addEventListener('input', () => this.handleSettingChange(id, element));
-            }
+        settingsToggle.addEventListener('click', () => {
+            settingsSection.classList.toggle('collapsed');
+            const chevron = settingsToggle.querySelector('.chevron');
+            chevron.style.transform = settingsSection.classList.contains('collapsed') 
+                ? 'rotate(0deg)' : 'rotate(180deg)';
         });
 
-        // Title input
-        document.getElementById('doc-title').addEventListener('input', (e) => {
-            this.configManager.set('subtitle.title', e.target.value);
+        // Settings change events
+        const titleInput = this.container.querySelector('#pdf-title');
+        const columnsSelect = this.container.querySelector('#pdf-columns');
+        const fontSizeSelect = this.container.querySelector('#pdf-font-size');
+        const removeTimestampsCheckbox = this.container.querySelector('#remove-timestamps');
+
+        titleInput.addEventListener('input', (e) => {
+            this.config.set('subtitle.title', e.target.value);
+        });
+
+        columnsSelect.addEventListener('change', (e) => {
+            this.config.set('subtitle.columns', parseInt(e.target.value));
+        });
+
+        fontSizeSelect.addEventListener('change', (e) => {
+            this.config.set('subtitle.fontSize', parseInt(e.target.value));
+        });
+
+        removeTimestampsCheckbox.addEventListener('change', (e) => {
+            this.config.set('subtitle.removeTimestamps', e.target.checked);
         });
     }
 
-    handleSettingChange(settingId, element) {
-        const value = element.type === 'checkbox' ? element.checked : 
-                     element.type === 'range' ? parseInt(element.value) : element.value;
-        
-        const settingMap = {
-            'pdf-columns': 'subtitle.pdfColumns',
-            'pdf-font-size': 'subtitle.pdfFontSize',
-            'show-timestamps-pdf': 'subtitle.showTimestampsInPDF',
-            'show-title': 'subtitle.showTitle'
-        };
-
-        if (settingMap[settingId]) {
-            // Special handling for timestamps (inverted)
-            if (settingId === 'show-timestamps-pdf') {
-                this.configManager.set('subtitle.removeTimestampsInPDF', !value);
-            } else {
-                this.configManager.set(settingMap[settingId], value);
-            }
-        }
-
-        // Update range value display
-        if (element.type === 'range') {
-            const valueSpan = element.nextElementSibling;
-            if (valueSpan && valueSpan.classList.contains('range-value')) {
-                const unit = settingId.includes('font-size') ? 'pt' : '';
-                valueSpan.textContent = value + unit;
-            }
-        }
-    }
-
-    async handleFileSelect(file) {
+    async processFile(file) {
         try {
             this.originalFileName = file.name.replace(/\.[^/.]+$/, "");
+            
+            const progressNotification = this.notification.info('Processing subtitle file...', 0);
+            
             const text = await this.readFile(file);
+            this.processedContent = this.cleanSubtitleText(text);
             
-            // Parse subtitle entries with timestamps - FIXED LOGIC
-            this.subtitleEntries = this.parseSubtitleFile(text);
-            this.processedText = this.processSubtitleText(text);
+            // Update output
+            const outputTextarea = this.container.querySelector('#output-content');
+            outputTextarea.value = this.processedContent;
             
-            // Debug log
-            console.log('Parsed entries:', this.subtitleEntries.length);
-            console.log('First few entries:', this.subtitleEntries.slice(0, 3));
+            // Enable buttons
+            this.enableActionButtons();
             
-            document.getElementById('output-text').value = this.processedText;
-            this.updateUI();
+            this.notification.remove(progressNotification);
+            this.notification.success(`File processed successfully! ${this.processedContent.split('\n').filter(l => l.trim()).length} lines cleaned.`);
             
-            this.notificationManager.success(`File "${file.name}" processed successfully! Found ${this.subtitleEntries.length} subtitle entries.`);
         } catch (error) {
-            console.error('File processing error:', error);
-            this.notificationManager.error(`Error processing file: ${error.message}`);
+            this.notification.error(`Failed to process file: ${error.message}`);
         }
     }
 
@@ -214,293 +206,277 @@ export class SubtitleProcessor {
         });
     }
 
-    parseSubtitleFile(text) {
-        const entries = [];
+    cleanSubtitleText(text) {
+        let lines = text.split('\n');
+        let cleaned = [];
+        let currentBlock = [];
         
-        // Remove BOM if present
-        text = text.replace(/^\uFEFF/, '');
-        
-        // Split by double newlines to get subtitle blocks
-        const blocks = text.split(/\n\s*\n/);
-        
-        console.log('Total blocks found:', blocks.length);
-        
-        for (let i = 0; i < blocks.length; i++) {
-            const block = blocks[i].trim();
-            if (!block) continue;
+        for (let line of lines) {
+            line = line.trim();
             
-            const lines = block.split('\n').map(line => line.trim()).filter(line => line);
+            // Skip empty lines between blocks
+            if (!line) {
+                if (currentBlock.length > 0) {
+                    // Process current block
+                    const processedBlock = this.processSubtitleBlock(currentBlock);
+                    if (processedBlock) {
+                        cleaned.push(processedBlock);
+                    }
+                    currentBlock = [];
+                }
+                continue;
+            }
             
-            if (lines.length >= 2) {
-                let index = null;
-                let timestamp = null;
-                let content = [];
-                
-                // Try to identify the structure
-                for (let j = 0; j < lines.length; j++) {
-                    const line = lines[j];
-                    
-                    // Check if it's a number (subtitle index)
-                    if (/^\d+$/.test(line) && index === null) {
-                        index = line;
-                    }
-                    // Check if it's a timestamp
-                    else if (line.includes('-->') && timestamp === null) {
-                        timestamp = line;
-                    }
-                    // Otherwise it's content
-                    else {
-                        content.push(line);
-                    }
-                }
-                
-                // If we have both timestamp and content, add the entry
-                if (timestamp && content.length > 0) {
-                    entries.push({
-                        index: index || (entries.length + 1).toString(),
-                        timestamp: timestamp,
-                        content: content.join('\n')
-                    });
-                }
-                // If no timestamp found but we have content, create a simple entry
-                else if (content.length > 0) {
-                    entries.push({
-                        index: (entries.length + 1).toString(),
-                        timestamp: null,
-                        content: lines.join('\n')
-                    });
-                }
+            currentBlock.push(line);
+        }
+        
+        // Process last block
+        if (currentBlock.length > 0) {
+            const processedBlock = this.processSubtitleBlock(currentBlock);
+            if (processedBlock) {
+                cleaned.push(processedBlock);
             }
         }
         
-        console.log('Entries parsed:', entries.length);
-        return entries;
+        return cleaned.join('\n');
     }
 
-    processSubtitleText(text) {
-        const config = this.configManager.get('subtitle');
-        let processed = text;
-
-        // Remove BOM if present
-        processed = processed.replace(/^\uFEFF/, '');
-
-        // Remove line numbers (like "1", "2", "3" on separate lines)
-        if (config.removeLineNumbers) {
-            processed = processed.replace(/^\d+\s*$/gm, '');
-        }
-
-        // Remove timestamps for text output (but keep for PDF)
-        if (config.removeTimestamps) {
-            processed = processed.replace(/\d{2}:\d{2}:\d{2}[.,]\d{3}\s*-->\s*\d{2}:\d{2}:\d{2}[.,]\d{3}/g, '');
-        }
-
-        // Clean up extra whitespace
-        processed = processed.replace(/\n\s*\n\s*\n/g, '\n\n');
-        processed = processed.replace(/^\s+|\s+$/g, '');
-
-        return processed;
-    }
-
-    async downloadPDF() {
-        // Check both conditions
-        if (!this.subtitleEntries || this.subtitleEntries.length === 0) {
-            console.log('No subtitle entries found. Entries:', this.subtitleEntries);
-            this.notificationManager.error('No subtitle entries found. Please upload a valid subtitle file.');
-            return;
-        }
-
-        if (!this.processedText) {
-            console.log('No processed text found.');
-            this.notificationManager.error('No content to export. Please upload a file first.');
-            return;
-        }
-
-        try {
-            this.notificationManager.info('Generating PDF... Please wait.');
-            
-            const config = this.configManager.validatePDFConfig(this.configManager.config);
-            console.log('PDF config:', config);
-            console.log('Subtitle entries for PDF:', this.subtitleEntries.length);
-            
-            await this.generatePDF(this.subtitleEntries, config);
-            
-            this.notificationManager.success('PDF generated successfully!');
-        } catch (error) {
-            console.error('PDF generation error:', error);
-            this.notificationManager.error(`Failed to generate PDF: ${error.message}`);
-        }
-    }
-
-    async generatePDF(entries, config) {
-        const { jsPDF } = window.jspdf;
-        const doc = new jsPDF('p', 'mm', 'a4');
+    processSubtitleBlock(block) {
+        let result = [];
         
-        // Page settings
-        const pageWidth = doc.internal.pageSize.getWidth();
-        const pageHeight = doc.internal.pageSize.getHeight();
-        const margin = 15;
-        const contentWidth = pageWidth - (margin * 2);
-        
-        let yPosition = margin;
-
-        // Add title if enabled and provided
-        if (config.showTitle && config.title.trim()) {
-            const titleImage = await this.textRenderer.renderTitle(config.title, {
-                fontSize: 14,
-                maxWidth: contentWidth * 2,
-                quality: 2
-            });
-            
-            // Center the title
-            const titleWidth = Math.min(titleImage.width, contentWidth);
-            const titleX = (pageWidth - titleWidth) / 2;
-            
-            doc.addImage(titleImage.dataUrl, 'PNG', titleX, yPosition, titleWidth, titleImage.height);
-            yPosition += titleImage.height + 10;
-            
-            // Add separator line
-            doc.setLineWidth(0.5);
-            doc.line(margin, yPosition, pageWidth - margin, yPosition);
-            yPosition += 10;
-        }
-
-        // Calculate column layout
-        const columnWidth = (contentWidth - ((config.columns - 1) * 8)) / config.columns;
-        let currentColumn = 0;
-        let columnStartY = yPosition;
-
-        console.log('Starting PDF generation with', entries.length, 'entries');
-
-        // Process each subtitle entry
-        for (let i = 0; i < entries.length; i++) {
-            const entry = entries[i];
-            console.log(`Processing entry ${i + 1}:`, entry);
-            
-            const columnX = margin + (currentColumn * (columnWidth + 8));
-            
-            // Show timestamps if enabled and available
-            if (!config.removeTimestampsInPDF && entry.timestamp) {
-                const timestampImage = this.textRenderer.renderTimestamp(entry.timestamp, {
-                    fontSize: config.fontSize - 1,
-                    maxWidth: columnWidth * 2,
-                    quality: 2
-                });
-                
-                // Check if we need a new page
-                if (yPosition + timestampImage.height + 20 > pageHeight - margin) {
-                    if (currentColumn < config.columns - 1) {
-                        currentColumn++;
-                        yPosition = columnStartY;
-                    } else {
-                        doc.addPage();
-                        currentColumn = 0;
-                        yPosition = margin;
-                        columnStartY = margin;
-                    }
-                }
-                
-                const finalX = margin + (currentColumn * (columnWidth + 8));
-                doc.addImage(timestampImage.dataUrl, 'PNG', finalX, yPosition, 
-                           Math.min(timestampImage.width, columnWidth), timestampImage.height);
-                yPosition += timestampImage.height + 2;
+        for (let line of block) {
+            // Skip subtitle numbers (just numbers)
+            if (/^\d+$/.test(line)) {
+                continue;
             }
             
-            // Render content
-            const contentImage = this.textRenderer.renderTextToImage(entry.content, {
-                fontSize: config.fontSize,
-                maxWidth: columnWidth * 2,
-                lineHeight: 1.3,
-                quality: 2
-            });
-            
-            // Check if content fits
-            if (yPosition + contentImage.height + 8 > pageHeight - margin) {
-                if (currentColumn < config.columns - 1) {
-                    currentColumn++;
-                    yPosition = columnStartY;
-                } else {
-                    doc.addPage();
-                    currentColumn = 0;
-                    yPosition = margin;
-                    columnStartY = margin;
-                }
-                
-                // Re-render timestamp if we moved to new column/page
-                if (!config.removeTimestampsInPDF && entry.timestamp) {
-                    const timestampImage = this.textRenderer.renderTimestamp(entry.timestamp, {
-                        fontSize: config.fontSize - 1,
-                        maxWidth: columnWidth * 2,
-                        quality: 2
-                    });
-                    
-                    const finalX = margin + (currentColumn * (columnWidth + 8));
-                    doc.addImage(timestampImage.dataUrl, 'PNG', finalX, yPosition, 
-                               Math.min(timestampImage.width, columnWidth), timestampImage.height);
-                    yPosition += timestampImage.height + 2;
-                }
+            // Keep timestamps (SRT format)
+            if (/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/.test(line)) {
+                result.push(line);
+                continue;
             }
             
-            const finalX = margin + (currentColumn * (columnWidth + 8));
-            doc.addImage(contentImage.dataUrl, 'PNG', finalX, yPosition, 
-                       Math.min(contentImage.width, columnWidth), contentImage.height);
-            yPosition += contentImage.height + 8; // Space between entries
+            // Keep actual subtitle text
+            if (line && !(/^\d+$/.test(line))) {
+                result.push(line);
+            }
         }
-
-        // Save PDF
-        const fileName = this.originalFileName || 'subtitle-export';
-        doc.save(`${fileName}.pdf`);
         
-        console.log('PDF saved successfully');
+        return result.length > 0 ? result.join('\n') : '';
+    }
+
+    enableActionButtons() {
+        const buttons = this.container.querySelectorAll('#output-actions button');
+        buttons.forEach(btn => {
+            btn.disabled = false;
+            btn.classList.remove('disabled');
+        });
+    }
+
+    copyContent() {
+        if (!this.processedContent) return;
+        
+        navigator.clipboard.writeText(this.processedContent).then(() => {
+            this.notification.success('Content copied to clipboard!');
+        }).catch(() => {
+            // Fallback for older browsers
+            const textarea = this.container.querySelector('#output-content');
+            textarea.select();
+            document.execCommand('copy');
+            this.notification.success('Content copied to clipboard!');
+        });
     }
 
     downloadTXT() {
-        if (!this.processedText) {
-            this.notificationManager.error('No content to export. Please upload a file first.');
-            return;
-        }
-
-        const blob = new Blob([this.processedText], { type: 'text/plain;charset=utf-8' });
+        if (!this.processedContent) return;
+        
+        const blob = new Blob([this.processedContent], { type: 'text/plain;charset=utf-8' });
         const url = URL.createObjectURL(blob);
         const a = document.createElement('a');
         a.href = url;
-        a.download = `${this.originalFileName || 'subtitle-export'}.txt`;
+        a.download = `${this.originalFileName}_cleaned.txt`;
         document.body.appendChild(a);
         a.click();
         document.body.removeChild(a);
         URL.revokeObjectURL(url);
-
-        this.notificationManager.success('TXT file downloaded successfully!');
+        
+        this.notification.success('TXT file downloaded successfully!');
     }
 
-    copyToClipboard() {
-        if (!this.processedText) {
-            this.notificationManager.error('No content to copy.');
-            return;
+    async downloadPDF() {
+        if (!this.processedContent) return;
+
+        try {
+            const progressNotification = this.notification.info('Generating high-quality PDF...', 0);
+            
+            // Create HTML preview for PDF generation
+            const pdfContent = this.createPDFPreview();
+            
+            // Use html2canvas + jsPDF for better Vietnamese support
+            const canvas = await html2canvas(pdfContent, {
+                scale: 2, // High resolution
+                useCORS: true,
+                letterRendering: true,
+                allowTaint: false,
+                backgroundColor: '#ffffff',
+                width: 794, // A4 width in pixels (96 DPI)
+                height: 1123 // A4 height in pixels (96 DPI)
+            });
+
+            const { jsPDF } = window.jspdf;
+            const pdf = new jsPDF({
+                orientation: 'portrait',
+                unit: 'mm',
+                format: 'a4'
+            });
+
+            const imgData = canvas.toDataURL('image/png');
+            const imgWidth = 210; // A4 width in mm
+            const imgHeight = (canvas.height * imgWidth) / canvas.width;
+
+            let heightLeft = imgHeight;
+            let position = 0;
+
+            // Add first page
+            pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+            heightLeft -= 297; // A4 height in mm
+
+            // Add additional pages if needed
+            while (heightLeft >= 0) {
+                position = heightLeft - imgHeight;
+                pdf.addPage();
+                pdf.addImage(imgData, 'PNG', 0, position, imgWidth, imgHeight);
+                heightLeft -= 297;
+            }
+
+            // Clean up
+            document.body.removeChild(pdfContent);
+            
+            const fileName = `${this.originalFileName}_formatted.pdf`;
+            pdf.save(fileName);
+            
+            this.notification.remove(progressNotification);
+            this.notification.success(`High-quality PDF generated! Saved as ${fileName}`);
+            
+        } catch (error) {
+            this.notification.error(`Failed to generate PDF: ${error.message}`);
+            console.error('PDF generation error:', error);
+        }
+    }
+
+    createPDFPreview() {
+        // Get settings
+        const title = this.config.get('subtitle.title') || this.originalFileName || 'Subtitle Document';
+        const columns = this.config.get('subtitle.columns') || 3;
+        const fontSize = this.config.get('subtitle.fontSize') || 9;
+        const removeTimestamps = this.config.get('subtitle.removeTimestamps') || false;
+
+        // Process content
+        let content = this.processedContent;
+        if (removeTimestamps) {
+            content = content.replace(/\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/g, '');
+            content = content.replace(/\n\s*\n/g, '\n'); // Remove extra empty lines
         }
 
-        navigator.clipboard.writeText(this.processedText).then(() => {
-            this.notificationManager.success('Content copied to clipboard!');
-        }).catch(() => {
-            this.notificationManager.error('Failed to copy to clipboard.');
+        const lines = content.split('\n').filter(line => line.trim());
+
+        // Create HTML structure
+        const pdfContainer = document.createElement('div');
+        pdfContainer.style.cssText = `
+            width: 794px;
+            min-height: 1123px;
+            padding: 40px;
+            background: white;
+            font-family: 'Noto Sans', 'Inter', Arial, sans-serif;
+            font-size: ${fontSize}px;
+            line-height: 1.3;
+            color: #000;
+            box-sizing: border-box;
+        `;
+
+        // Add title
+        const titleElement = document.createElement('div');
+        titleElement.style.cssText = `
+            text-align: center;
+            font-size: 14px;
+            font-weight: bold;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #000;
+        `;
+        titleElement.textContent = title;
+        pdfContainer.appendChild(titleElement);
+
+        // Create columns container
+        const columnsContainer = document.createElement('div');
+        columnsContainer.style.cssText = `
+            display: grid;
+            grid-template-columns: repeat(${columns}, 1fr);
+            gap: 20px;
+            margin-top: 20px;
+        `;
+
+        // Create columns
+        const columnElements = [];
+        for (let i = 0; i < columns; i++) {
+            const column = document.createElement('div');
+            column.style.cssText = `
+                font-size: ${fontSize}px;
+                line-height: 1.3;
+                word-break: break-word;
+                hyphens: auto;
+            `;
+            columnElements.push(column);
+            columnsContainer.appendChild(column);
+        }
+
+        // Distribute content across columns
+        let currentColumn = 0;
+        let currentBlock = [];
+
+        lines.forEach((line, index) => {
+            line = line.trim();
+            if (!line) return;
+
+            // Check if this is a timestamp
+            const isTimestamp = /\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}/.test(line);
+            
+            if (isTimestamp) {
+                // Start new block
+                if (currentBlock.length > 0) {
+                    // Add previous block
+                    const blockDiv = document.createElement('div');
+                    blockDiv.style.cssText = 'margin-bottom: 12px;';
+                    blockDiv.innerHTML = currentBlock.join('<br>');
+                    columnElements[currentColumn].appendChild(blockDiv);
+                    
+                    // Move to next column
+                    currentColumn = (currentColumn + 1) % columns;
+                    currentBlock = [];
+                }
+                
+                // Add timestamp
+                currentBlock.push(`<span style="font-weight: 500; color: #333;">${line}</span>`);
+            } else {
+                // Add content line
+                currentBlock.push(line);
+            }
         });
-    }
 
-    updateUI() {
-        const hasContent = Boolean(this.processedText);
-        const hasEntries = Boolean(this.subtitleEntries && this.subtitleEntries.length > 0);
-        
-        document.getElementById('copy-btn').disabled = !hasContent;
-        document.getElementById('download-txt-btn').disabled = !hasContent;
-        document.getElementById('download-pdf-btn').disabled = !hasEntries; // Use subtitle entries for PDF
-        
-        // Update button text to show entry count
-        if (hasEntries) {
-            const pdfBtn = document.getElementById('download-pdf-btn');
-            const icon = pdfBtn.querySelector('i');
-            pdfBtn.innerHTML = '';
-            pdfBtn.appendChild(icon);
-            pdfBtn.appendChild(document.createTextNode(` Download PDF (${this.subtitleEntries.length} entries)`));
+        // Add last block
+        if (currentBlock.length > 0) {
+            const blockDiv = document.createElement('div');
+            blockDiv.style.cssText = 'margin-bottom: 12px;';
+            blockDiv.innerHTML = currentBlock.join('<br>');
+            columnElements[currentColumn].appendChild(blockDiv);
         }
+
+        pdfContainer.appendChild(columnsContainer);
+        
+        // Add to DOM temporarily for rendering
+        document.body.appendChild(pdfContainer);
+        
+        return pdfContainer;
     }
 
     destroy() {
