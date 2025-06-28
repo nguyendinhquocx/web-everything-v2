@@ -8,10 +8,9 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
-    <!-- Enhanced Vietnamese font support -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <!-- PDF Libraries -->
+    <!-- PDF Libraries - CRITICAL -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 </head>
@@ -34,28 +33,32 @@
     </style>
     
     <script type="module">
-        // Simple approach - wait for DOM and libraries, then start app
         document.addEventListener('DOMContentLoaded', async function() {
-            // Wait a bit for libraries to load
+            // Wait for libraries to load
             await new Promise(resolve => setTimeout(resolve, 500));
             
+            // Check if PDF libraries loaded
+            if (!window.jsPDF || !window.html2canvas) {
+                console.warn('⚠️ PDF libraries not loaded, retrying...');
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+            
             try {
-                // Import and start the app
                 const { ToolRegistry } = await import('./src/services/ToolRegistry.js');
                 const { SubtitleProcessor } = await import('./src/tools/SubtitleProcessor.js');
                 const { App } = await import('./src/components/App.js');
 
-                // Initialize tool registry
                 const toolRegistry = new ToolRegistry();
-
-                // Register tools
                 toolRegistry.register('subtitle-processor', SubtitleProcessor);
 
-                // Initialize app
                 const app = new App(toolRegistry);
                 app.mount('#app');
                 
                 console.log('✅ Everything Tool loaded successfully');
+                console.log('✅ PDF libraries status:', {
+                    jsPDF: !!window.jsPDF,
+                    html2canvas: !!window.html2canvas
+                });
             } catch (error) {
                 console.error('❌ Failed to load app:', error);
                 document.getElementById('app').innerHTML = `

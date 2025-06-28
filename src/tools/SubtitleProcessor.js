@@ -10,19 +10,6 @@ export class SubtitleProcessor {
         this.currentFile = null;
         this.processedText = '';
         this.isProcessing = false;
-        this.librariesReady = false;
-        
-        // Check libraries on init
-        this.checkLibraries();
-    }
-
-    checkLibraries() {
-        this.librariesReady = !!(window.jsPDF && window.html2canvas);
-        console.log('PDF Libraries status:', {
-            jsPDF: !!window.jsPDF,
-            html2canvas: !!window.html2canvas,
-            ready: this.librariesReady
-        });
     }
 
     mount(selector) {
@@ -72,9 +59,9 @@ export class SubtitleProcessor {
                             <i data-lucide="download" style="width: 14px; height: 14px;"></i>
                             Download TXT
                         </button>
-                        <button class="btn primary" id="download-pdf-btn" disabled>
-                            <i data-lucide="file-text" style="width: 14px; height: 14px;"></i>
-                            Download PDF
+                        <button class="btn primary" id="print-pdf-btn" disabled>
+                            <i data-lucide="printer" style="width: 14px; height: 14px;"></i>
+                            Print PDF
                         </button>
                         <button class="btn" id="clear-btn" style="display: none;">
                             <i data-lucide="trash-2" style="width: 14px; height: 14px;"></i>
@@ -103,7 +90,8 @@ export class SubtitleProcessor {
                 </div>
             </div>
 
-            <div class="settings-section">
+            <!-- PDF Settings moved to top for print layout -->
+            <div class="settings-section print-settings-page">
                 <div class="settings-toggle" id="settings-toggle">
                     <i data-lucide="settings" style="width: 16px; height: 16px;"></i>
                     <h3>PDF Settings</h3>
@@ -144,13 +132,22 @@ export class SubtitleProcessor {
                             <label for="auto-optimize">Auto optimize layout</label>
                         </div>
                     </div>
-                </div>
-
-                <div id="pdf-preview" class="pdf-preview" style="display: none;">
-                    <h4 id="preview-title">Document Preview</h4>
-                    <div id="preview-content" class="pdf-columns cols-3">
-                        <!-- Preview content will be generated here -->
+                    
+                    <div class="print-instructions">
+                        <h4>📖 Printing Instructions</h4>
+                        <p>• Click "Print PDF" to open print dialog</p>
+                        <p>• Select pages "2-end" to print only content</p>
+                        <p>• Page 1 contains these settings (will be excluded)</p>
                     </div>
+                </div>
+            </div>
+
+            <!-- PDF Preview - This will be on page 2+ when printing -->
+            <div class="print-page-break"></div>
+            <div id="pdf-preview" class="pdf-preview print-content-page" style="display: none;">
+                <h1 id="preview-title" class="pdf-title">Document Preview</h1>
+                <div id="preview-content" class="pdf-columns cols-3">
+                    <!-- Preview content will be generated here -->
                 </div>
             </div>
         `;
@@ -170,64 +167,6 @@ export class SubtitleProcessor {
 
         // Load saved settings
         this.loadSettings();
-        
-        // Check PDF button state
-        this.updatePDFButtonState();
-    }
-
-    updatePDFButtonState() {
-        const pdfBtn = document.getElementById('download-pdf-btn');
-        
-        // Re-check libraries
-        this.checkLibraries();
-        
-        if (!this.librariesReady) {
-            pdfBtn.title = 'PDF libraries are loading...';
-            
-            // Try to reload libraries
-            this.retryLoadLibraries();
-        } else {
-            pdfBtn.title = 'Download as PDF';
-        }
-    }
-
-    async retryLoadLibraries() {
-        console.log('🔄 Retrying to load PDF libraries...');
-        
-        try {
-            // Try to load jsPDF if missing
-            if (!window.jsPDF) {
-                await this.loadScript('https://unpkg.com/jspdf@latest/dist/jspdf.umd.min.js');
-            }
-            
-            // Try to load html2canvas if missing
-            if (!window.html2canvas) {
-                await this.loadScript('https://unpkg.com/html2canvas@1.4.1/dist/html2canvas.min.js');
-            }
-            
-            // Wait a bit for libraries to initialize
-            await new Promise(resolve => setTimeout(resolve, 500));
-            
-            this.checkLibraries();
-            
-            if (this.librariesReady) {
-                this.notificationManager.success('PDF libraries loaded successfully! You can now export to PDF.');
-            }
-            
-        } catch (error) {
-            console.error('Failed to load PDF libraries:', error);
-            this.notificationManager.error('Failed to load PDF libraries. Please refresh the page.');
-        }
-    }
-
-    loadScript(src) {
-        return new Promise((resolve, reject) => {
-            const script = document.createElement('script');
-            script.src = src;
-            script.onload = resolve;
-            script.onerror = reject;
-            document.head.appendChild(script);
-        });
     }
 
     bindEvents() {
@@ -239,7 +178,7 @@ export class SubtitleProcessor {
         // Output actions
         document.getElementById('copy-btn').onclick = () => this.copyToClipboard();
         document.getElementById('download-txt-btn').onclick = () => this.downloadTXT();
-        document.getElementById('download-pdf-btn').onclick = () => this.downloadPDF();
+        document.getElementById('print-pdf-btn').onclick = () => this.printPDF(); // Changed from downloadPDF
         document.getElementById('clear-btn').onclick = () => this.clearAll();
 
         // Settings toggle
@@ -345,18 +284,7 @@ export class SubtitleProcessor {
         // Enable buttons
         document.getElementById('copy-btn').disabled = false;
         document.getElementById('download-txt-btn').disabled = false;
-        
-        // Enable PDF button only if libraries are ready
-        const pdfBtn = document.getElementById('download-pdf-btn');
-        this.checkLibraries();
-        pdfBtn.disabled = !this.librariesReady;
-        
-        if (!this.librariesReady) {
-            pdfBtn.title = 'PDF libraries are loading... Click to retry';
-        } else {
-            pdfBtn.title = 'Download as PDF';
-        }
-        
+        document.getElementById('print-pdf-btn').disabled = false; // Always enable print
         document.getElementById('clear-btn').style.display = 'inline-flex';
     }
 
@@ -441,84 +369,37 @@ export class SubtitleProcessor {
         this.notificationManager.success('TXT file downloaded');
     }
 
-    async downloadPDF() {
-        // Re-check libraries first
-        this.checkLibraries();
-        
-        if (!this.librariesReady) {
-            console.log('Libraries not ready, attempting to reload...');
-            this.notificationManager.info('Loading PDF libraries... Please wait.');
-            
-            try {
-                await this.retryLoadLibraries();
-                
-                // Check again after retry
-                this.checkLibraries();
-                if (!this.librariesReady) {
-                    throw new Error('PDF libraries failed to load');
-                }
-            } catch (error) {
-                this.notificationManager.error('PDF libraries not available. Please refresh the page and try again.');
-                return;
-            }
+    // NEW: Print PDF function
+    printPDF() {
+        if (!this.processedText) {
+            this.notificationManager.error('No content to print');
+            return;
         }
 
         try {
-            this.notificationManager.info('Generating high-quality PDF...');
-            
-            const config = this.getPDFConfig();
-            const previewElement = document.getElementById('pdf-preview');
-            
             // Ensure preview is visible and updated
             this.updatePreview();
-            const wasHidden = previewElement.style.display === 'none';
-            if (wasHidden) {
-                previewElement.style.display = 'block';
-            }
-
-            // Wait a moment for rendering
-            await new Promise(resolve => setTimeout(resolve, 100));
-
-            // Generate canvas from preview
-            const canvas = await window.html2canvas(previewElement, {
-                scale: 2, // Higher quality
-                useCORS: true,
-                allowTaint: false,
-                backgroundColor: '#ffffff',
-                logging: false,
-                width: previewElement.scrollWidth,
-                height: previewElement.scrollHeight
-            });
-
-            // Hide preview if it was hidden
-            if (wasHidden) {
-                previewElement.style.display = 'none';
-            }
-
-            // Create PDF with proper Vietnamese font support
-            const { jsPDF } = window.jsPDF;
-            const pdf = new jsPDF({
-                orientation: 'portrait',
-                unit: 'mm',
-                format: 'a4'
-            });
-
-            const imgData = canvas.toDataURL('image/png', 1.0);
-            const imgWidth = 210; // A4 width in mm
-            const imgHeight = (canvas.height * imgWidth) / canvas.width;
-
-            // Add image to PDF
-            pdf.addImage(imgData, 'PNG', 0, 0, imgWidth, imgHeight);
             
-            // Save the PDF
-            const filename = this.getFileName() + '.pdf';
-            pdf.save(filename);
+            // Add print class to body for print-specific styles
+            document.body.classList.add('printing');
             
-            this.notificationManager.success(`PDF "${filename}" downloaded successfully!`);
+            // Show notification with instructions
+            this.notificationManager.info('🖨️ Print dialog opened. Select pages "2-end" to print only content.');
+            
+            // Open print dialog
+            setTimeout(() => {
+                window.print();
+                
+                // Remove print class after print dialog
+                setTimeout(() => {
+                    document.body.classList.remove('printing');
+                }, 1000);
+            }, 500);
             
         } catch (error) {
-            console.error('PDF generation error:', error);
-            this.notificationManager.error(`Failed to generate PDF: ${error.message}`);
+            console.error('Print error:', error);
+            this.notificationManager.error(`Print failed: ${error.message}`);
+            document.body.classList.remove('printing');
         }
     }
 
@@ -563,7 +444,7 @@ export class SubtitleProcessor {
         const previewTitle = document.getElementById('preview-title');
         
         // Update title
-        previewTitle.textContent = config.title || 'Document Preview';
+        previewTitle.textContent = config.title || this.getFileName();
         
         // Update columns class
         previewContent.className = `pdf-columns cols-${config.columns}`;
@@ -572,7 +453,13 @@ export class SubtitleProcessor {
         previewContent.style.fontSize = config.fontSize + 'px';
         
         // Process text for preview
-        const lines = this.processedText.split('\n').filter(line => line.trim() !== '');
+        let lines = this.processedText.split('\n').filter(line => line.trim() !== '');
+        
+        // Remove timestamps if configured for PDF
+        if (!config.showTimestamps) {
+            lines = lines.filter(line => !this.isTimestamp(line));
+        }
+        
         const entriesPerColumn = Math.ceil(lines.length / config.columns);
         
         // Create columns
@@ -640,7 +527,7 @@ export class SubtitleProcessor {
         // Disable buttons
         document.getElementById('copy-btn').disabled = true;
         document.getElementById('download-txt-btn').disabled = true;
-        document.getElementById('download-pdf-btn').disabled = true;
+        document.getElementById('print-pdf-btn').disabled = true;
         document.getElementById('clear-btn').style.display = 'none';
         
         this.notificationManager.info('Interface cleared');
