@@ -24,7 +24,6 @@ export class App {
         if (tools.length === 0) {
             this.container.innerHTML = `
                 <div style="padding: 40px; text-align: center; font-family: Inter, sans-serif;">
-                    <h1>Everything Tool</h1>
                     <p style="color: #666;">No tools available</p>
                 </div>
             `;
@@ -33,10 +32,6 @@ export class App {
         
         this.container.innerHTML = `
             <div class="container">
-                <header class="header">
-                    <h1>Everything Tool</h1>
-                </header>
-                
                 ${tools.length > 1 ? this.renderNavigation(tools) : ''}
                 
                 <div id="tool-content" class="tool-container">

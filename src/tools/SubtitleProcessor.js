@@ -1,133 +1,78 @@
 import { FileUploader } from '../components/common/FileUploader.js';
-import { NotificationManager } from '../components/common/NotificationManager.js';
 import { ConfigManager } from '../services/ConfigManager.js';
 
 export class SubtitleProcessor {
     constructor() {
         this.fileUploader = null;
-        this.notificationManager = new NotificationManager();
-        this.configManager = new ConfigManager();
+        this.processedText = '';
+        this.originalFilename = '';
+        this.config = new ConfigManager();
+        this.stats = { lines: 0, characters: 0 };
+        // Add these properties that were missing
         this.currentFile = null;
         this.processedContent = '';
         this.originalContent = '';
-        this.stats = { lines: 0, characters: 0, processTime: 0 };
     }
 
     mount(selector) {
         this.container = document.querySelector(selector);
         this.render();
+        this.initFileUploader();
         this.bindEvents();
-        console.log('✅ SubtitleProcessor mounted');
     }
 
     render() {
         this.container.innerHTML = `
             <div class="subtitle-processor">
-                <div class="section">
+                <div class="tool-header">
                     <h2>Subtitle Processor</h2>
-                    <p class="description">Upload .srt or .txt files to clean and format subtitles</p>
+                    <p class="tool-description">Upload .srt or .txt files to clean and format subtitles</p>
                 </div>
 
-                <div class="section">
-                    <div id="file-uploader"></div>
-                    <div id="file-info" class="file-info" style="display: none;"></div>
-                </div>
+                <div id="file-upload-area" class="upload-section"></div>
 
-                <div class="section">
-                    <div class="section-header">
+                <div class="output-section">
+                    <div class="output-header">
                         <h3>Output</h3>
-                        <div class="action-buttons">
-                            <button id="copy-btn" class="btn btn-secondary" disabled>
-                                <i data-lucide="copy"></i> Copy
+                        <div class="output-stats" id="output-stats" style="display: none;">
+                            <span id="line-count">0 lines</span> • <span id="char-count">0 characters</span>
+                        </div>
+                        <div class="output-actions">
+                            <button class="btn-secondary" id="copy-btn" disabled>
+                                <i data-lucide="copy"></i>
+                                Copy
                             </button>
-                            <button id="download-btn" class="btn btn-secondary" disabled>
-                                <i data-lucide="download"></i> Download TXT
+                            <button class="btn-secondary" id="download-btn" disabled>
+                                <i data-lucide="download"></i>
+                                Download TXT
                             </button>
-                            <button id="print-pdf-btn" class="btn btn-primary" disabled>
-                                <i data-lucide="printer"></i> Print PDF
+                            <button class="btn-secondary" id="pdf-btn" disabled>
+                                <i data-lucide="printer"></i>
+                                Print PDF
                             </button>
-                            <button id="clear-btn" class="btn btn-outline" disabled>
-                                <i data-lucide="trash-2"></i> Clear
+                            <button class="btn-secondary" id="clear-btn" disabled>
+                                <i data-lucide="trash-2"></i>
+                                Clear
                             </button>
                         </div>
                     </div>
-                    
                     <textarea id="output-text" 
                               class="output-textarea" 
                               placeholder="Upload a file to see the processed output here. The text will be cleaned, formatted, and ready for use."
                               readonly></textarea>
-                    
-                    <div id="stats" class="stats" style="display: none;"></div>
                 </div>
 
-                <div class="section">
-                    <details class="settings-panel">
-                        <summary class="settings-header">
-                            <i data-lucide="settings"></i> PDF Settings
-                        </summary>
-                        <div class="settings-content">
-                            ${this.renderPDFSettings()}
-                        </div>
-                    </details>
+                <div class="settings-section">
+                    <button class="settings-toggle" id="settings-toggle">
+                        <i data-lucide="settings"></i>
+                        PDF Settings
+                    </button>
+                    <div class="settings-panel" id="settings-panel" style="display: none;">
+                        ${this.renderPDFSettings()}
+                    </div>
                 </div>
             </div>
         `;
-
-        this.initializeComponents();
-    }
-
-    renderPDFSettings() {
-        const config = this.configManager.get('subtitle');
-        
-        return `
-            <div class="settings-grid">
-                <div class="setting-item">
-                    <label for="pdf-title">Document Title</label>
-                    <input type="text" id="pdf-title" value="${config.title || ''}" 
-                           placeholder="Enter document title (optional)">
-                </div>
-                
-                <div class="setting-item">
-                    <label for="pdf-columns">Columns</label>
-                    <select id="pdf-columns">
-                        <option value="1" ${config.pdfColumns === 1 ? 'selected' : ''}>1 Column</option>
-                        <option value="2" ${config.pdfColumns === 2 ? 'selected' : ''}>2 Columns</option>
-                        <option value="3" ${config.pdfColumns === 3 ? 'selected' : ''}>3 Columns</option>
-                        <option value="4" ${config.pdfColumns === 4 ? 'selected' : ''}>4 Columns</option>
-                    </select>
-                </div>
-                
-                <div class="setting-item">
-                    <label for="pdf-font-size">Font Size</label>
-                    <select id="pdf-font-size">
-                        <option value="6" ${config.pdfFontSize === 6 ? 'selected' : ''}>6pt</option>
-                        <option value="7" ${config.pdfFontSize === 7 ? 'selected' : ''}>7pt</option>
-                        <option value="8" ${config.pdfFontSize === 8 ? 'selected' : ''}>8pt</option>
-                        <option value="9" ${config.pdfFontSize === 9 ? 'selected' : ''}>9pt</option>
-                        <option value="10" ${config.pdfFontSize === 10 ? 'selected' : ''}>10pt</option>
-                        <option value="12" ${config.pdfFontSize === 12 ? 'selected' : ''}>12pt</option>
-                    </select>
-                </div>
-                
-                <div class="setting-item">
-                    <label class="checkbox-label">
-                        <input type="checkbox" id="show-timestamps" 
-                               ${config.showTimestampsInPDF !== false ? 'checked' : ''}>
-                        Show timestamps in PDF
-                    </label>
-                </div>
-            </div>
-        `;
-    }
-
-    initializeComponents() {
-        // Initialize file uploader
-        this.fileUploader = new FileUploader({
-            accept: '.srt,.txt',
-            multiple: false,
-            onFileSelect: (file) => this.handleFileSelect(file)
-        });
-        this.fileUploader.mount('#file-uploader');
 
         // Initialize Lucide icons
         if (window.lucide) {
@@ -135,60 +80,107 @@ export class SubtitleProcessor {
         }
     }
 
+    renderPDFSettings() {
+        const config = this.config.get('subtitle') || {};
+        
+        return `
+            <div class="settings-grid">
+                <div class="setting-group">
+                    <label>Title</label>
+                    <input type="text" id="pdf-title" value="${config.title || ''}" placeholder="Optional PDF title">
+                </div>
+                
+                <div class="setting-group">
+                    <label>Columns</label>
+                    <select id="pdf-columns">
+                        <option value="1" ${config.pdfColumns === 1 ? 'selected' : ''}>1 Column</option>
+                        <option value="2" ${config.pdfColumns === 2 ? 'selected' : ''}>2 Columns</option>
+                        <option value="3" ${config.pdfColumns === 3 || !config.pdfColumns ? 'selected' : ''}>3 Columns</option>
+                        <option value="4" ${config.pdfColumns === 4 ? 'selected' : ''}>4 Columns</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group">
+                    <label>Font Size</label>
+                    <select id="pdf-font-size">
+                        <option value="6" ${config.pdfFontSize === 6 ? 'selected' : ''}>6pt (Tiny)</option>
+                        <option value="7" ${config.pdfFontSize === 7 ? 'selected' : ''}>7pt (Small)</option>
+                        <option value="8" ${config.pdfFontSize === 8 || !config.pdfFontSize ? 'selected' : ''}>8pt (Normal)</option>
+                        <option value="9" ${config.pdfFontSize === 9 ? 'selected' : ''}>9pt (Medium)</option>
+                        <option value="10" ${config.pdfFontSize === 10 ? 'selected' : ''}>10pt (Large)</option>
+                    </select>
+                </div>
+                
+                <div class="setting-group checkbox-group">
+                    <label>
+                        <input type="checkbox" id="show-timestamps" ${config.showTimestampsInPDF !== false ? 'checked' : ''}>
+                        Show timestamps in PDF
+                    </label>
+                </div>
+            </div>
+        `;
+    }
+
+    initFileUploader() {
+        this.fileUploader = new FileUploader({
+            accept: '.srt,.txt',
+            onFileSelect: (file) => this.handleFileSelect(file)  // Changed method name
+        });
+        this.fileUploader.mount('#file-upload-area');
+    }
+
     bindEvents() {
+        // Settings toggle
+        document.getElementById('settings-toggle').addEventListener('click', () => {
+            const panel = document.getElementById('settings-panel');
+            const isVisible = panel.style.display !== 'none';
+            panel.style.display = isVisible ? 'none' : 'block';
+        });
+
+        // Settings changes
+        document.getElementById('pdf-title').addEventListener('input', (e) => {
+            this.config.set('subtitle.title', e.target.value);
+        });
+
+        document.getElementById('pdf-columns').addEventListener('change', (e) => {
+            this.config.set('subtitle.pdfColumns', parseInt(e.target.value));
+        });
+
+        document.getElementById('pdf-font-size').addEventListener('change', (e) => {
+            this.config.set('subtitle.pdfFontSize', parseInt(e.target.value));
+        });
+
+        document.getElementById('show-timestamps').addEventListener('change', (e) => {
+            this.config.set('subtitle.showTimestampsInPDF', e.target.checked);
+        });
+
         // Action buttons
         document.getElementById('copy-btn').addEventListener('click', () => this.copyToClipboard());
         document.getElementById('download-btn').addEventListener('click', () => this.downloadTXT());
-        document.getElementById('print-pdf-btn').addEventListener('click', () => this.printPDF());
-        document.getElementById('clear-btn').addEventListener('click', () => this.clearContent());
-
-        // Settings
-        document.getElementById('pdf-title').addEventListener('input', (e) => {
-            this.configManager.set('subtitle.title', e.target.value);
-        });
-        
-        document.getElementById('pdf-columns').addEventListener('change', (e) => {
-            this.configManager.set('subtitle.pdfColumns', parseInt(e.target.value));
-        });
-        
-        document.getElementById('pdf-font-size').addEventListener('change', (e) => {
-            this.configManager.set('subtitle.pdfFontSize', parseInt(e.target.value));
-        });
-        
-        document.getElementById('show-timestamps').addEventListener('change', (e) => {
-            this.configManager.set('subtitle.showTimestampsInPDF', e.target.checked);
-        });
+        document.getElementById('pdf-btn').addEventListener('click', () => this.printPDF());  // Changed method name
+        document.getElementById('clear-btn').addEventListener('click', () => this.clearContent());  // Changed method name
     }
 
+    // Fixed method name to match the working version
     async handleFileSelect(file) {
-        const startTime = Date.now();
-        
         try {
             this.currentFile = file;
+            this.originalFilename = file.name.replace(/\.[^/.]+$/, "");
             const content = await this.readFile(file);
             this.originalContent = content;
             
-            // Process the content
+            // Process the content using the working method
             this.processedContent = this.processSubtitleContent(content);
+            this.processedText = this.processedContent; // Keep both for compatibility
             
-            // Calculate stats
-            this.stats = {
-                lines: this.processedContent.split('\n').filter(line => line.trim()).length,
-                characters: this.processedContent.length,
-                processTime: Date.now() - startTime
-            };
-            
-            // Update UI
             this.updateOutput();
-            this.updateFileInfo();
-            this.updateStats();
             this.enableButtons();
-            
-            this.notificationManager.success(`File processed successfully! ${this.stats.lines} lines, ${this.stats.characters} characters.`);
-            
         } catch (error) {
             console.error('File processing error:', error);
-            this.notificationManager.error(`Failed to process file: ${error.message}`);
+            this.processedContent = '';
+            this.processedText = '';
+            this.updateOutput();
+            this.disableButtons();
         }
     }
 
@@ -201,6 +193,7 @@ export class SubtitleProcessor {
         });
     }
 
+    // Use the working subtitle processing logic from reference code
     processSubtitleContent(content) {
         // Split content into lines and clean
         const lines = content.split('\n').map(line => line.trim());
@@ -246,102 +239,77 @@ export class SubtitleProcessor {
         }).join('\n\n'); // Double newline between blocks
     }
 
+    // Add the missing isTimestamp method
     isTimestamp(line) {
         // Match SRT timestamp format: 00:00:00,000 --> 00:00:00,000
         return /^\d{2}:\d{2}:\d{2},\d{3}\s*-->\s*\d{2}:\d{2}:\d{2},\d{3}$/.test(line);
     }
 
     updateOutput() {
-        const outputText = document.getElementById('output-text');
-        outputText.value = this.processedContent;
-    }
+        const outputTextarea = document.getElementById('output-text');
+        outputTextarea.value = this.processedContent;
 
-    updateFileInfo() {
-        const fileInfo = document.getElementById('file-info');
-        if (this.currentFile) {
-            fileInfo.innerHTML = `
-                <div class="file-details">
-                    <span class="file-name">${this.currentFile.name}</span>
-                    <span class="file-size">${this.formatFileSize(this.currentFile.size)} • ${this.currentFile.type || 'text/plain'}</span>
-                    <button class="file-remove" onclick="this.closest('.subtitle-processor').querySelector('#clear-btn').click()">×</button>
-                </div>
-            `;
-            fileInfo.style.display = 'block';
+        // Update stats with proper thousand separators
+        this.stats.lines = this.processedContent ? this.processedContent.split('\n').filter(line => line.trim()).length : 0;
+        this.stats.characters = this.processedContent.length;
+
+        const statsElement = document.getElementById('output-stats');
+        const lineCountElement = document.getElementById('line-count');
+        const charCountElement = document.getElementById('char-count');
+
+        if (this.processedContent) {
+            // Format numbers with thousand separators
+            lineCountElement.textContent = `${this.formatNumber(this.stats.lines)} lines`;
+            charCountElement.textContent = `${this.formatNumber(this.stats.characters)} characters`;
+            statsElement.style.display = 'block';
+        } else {
+            statsElement.style.display = 'none';
         }
     }
 
-    updateStats() {
-        const stats = document.getElementById('stats');
-        stats.innerHTML = `
-            <div class="stats-grid">
-                <div class="stat-item">
-                    <span class="stat-value">${this.stats.lines}</span>
-                    <span class="stat-label">Lines</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">${this.stats.characters.toLocaleString()}</span>
-                    <span class="stat-label">Characters</span>
-                </div>
-                <div class="stat-item">
-                    <span class="stat-value">${this.stats.processTime}ms</span>
-                    <span class="stat-label">Process Time</span>
-                </div>
-            </div>
-        `;
-        stats.style.display = 'block';
+    formatNumber(num) {
+        return num.toLocaleString();
     }
 
     enableButtons() {
         document.getElementById('copy-btn').disabled = false;
         document.getElementById('download-btn').disabled = false;
-        document.getElementById('print-pdf-btn').disabled = false;
+        document.getElementById('pdf-btn').disabled = false;
         document.getElementById('clear-btn').disabled = false;
     }
 
     disableButtons() {
         document.getElementById('copy-btn').disabled = true;
         document.getElementById('download-btn').disabled = true;
-        document.getElementById('print-pdf-btn').disabled = true;
+        document.getElementById('pdf-btn').disabled = true;
         document.getElementById('clear-btn').disabled = true;
     }
 
     async copyToClipboard() {
         try {
             await navigator.clipboard.writeText(this.processedContent);
-            this.notificationManager.success('Content copied to clipboard!');
         } catch (error) {
             console.error('Copy failed:', error);
-            this.notificationManager.error('Failed to copy content');
         }
     }
 
     downloadTXT() {
-        try {
-            const blob = new Blob([this.processedContent], { type: 'text/plain;charset=utf-8' });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            
-            a.href = url;
-            a.download = this.getDownloadFilename('.txt');
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-            
-            this.notificationManager.success('TXT file downloaded successfully!');
-        } catch (error) {
-            console.error('Download failed:', error);
-            this.notificationManager.error('Failed to download file');
-        }
+        const blob = new Blob([this.processedContent], { type: 'text/plain;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = this.getDownloadFilename('.txt');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
     }
 
+    // Use the complete working printPDF method from reference code
     async printPDF() {
         try {
-            // Hide notifications during print to prevent them from being included
-            this.hideNotifications();
-            
             // Get PDF configuration
-            const config = this.configManager.validatePDFConfig(this.configManager.config);
+            const config = this.config.validatePDFConfig(this.config.config);
             
             // Use html2canvas and jsPDF
             if (window.html2canvas && window.jsPDF) {
@@ -407,7 +375,7 @@ export class SubtitleProcessor {
                 await new Promise(resolve => setTimeout(resolve, 200));
                 
                 const canvas = await window.html2canvas(tempContainer, {
-                    scale: config.fontQuality,
+                    scale: config.fontQuality || 2,
                     useCORS: true,
                     allowTaint: true,
                     backgroundColor: '#ffffff'
@@ -434,7 +402,7 @@ export class SubtitleProcessor {
                 // Clean up
                 document.body.removeChild(tempContainer);
                 
-                // Open print dialog directly without notification
+                // Open print dialog directly
                 const pdfUrl = pdf.output('bloburl');
                 const printWindow = window.open(pdfUrl, '_blank');
                 
@@ -454,7 +422,7 @@ export class SubtitleProcessor {
                 
             } else {
                 // Fallback: browser print with title
-                const config = this.configManager.validatePDFConfig(this.configManager.config);
+                const config = this.config.validatePDFConfig(this.config.config);
                 const pdfContent = this.preparePDFContent(config);
                 
                 const printWindow = window.open('', '_blank');
@@ -519,18 +487,12 @@ export class SubtitleProcessor {
                 setTimeout(() => printWindow.print(), 250);
             }
             
-            // Show notifications again after a delay
-            setTimeout(() => {
-                this.showNotifications();
-            }, 1000);
-            
         } catch (error) {
             console.error('PDF print failed:', error);
-            this.showNotifications();
-            this.notificationManager.error('Failed to generate PDF');
         }
     }
 
+    // Add the missing preparePDFContent method
     preparePDFContent(config) {
         const lines = this.processedContent.split('\n');
         const blocks = [];
@@ -567,32 +529,11 @@ export class SubtitleProcessor {
         }).join('');
     }
 
-    hideNotifications() {
-        const notificationContainer = document.querySelector('.notifications-container');
-        if (notificationContainer) {
-            notificationContainer.style.display = 'none';
-        }
-    }
-
-    showNotifications() {
-        const notificationContainer = document.querySelector('.notifications-container');
-        if (notificationContainer) {
-            notificationContainer.style.display = 'block';
-        }
-    }
-
-    clearContent() {
-        this.currentFile = null;
-        this.processedContent = '';
-        this.originalContent = '';
-        this.stats = { lines: 0, characters: 0, processTime: 0 };
-        
-        document.getElementById('output-text').value = '';
-        document.getElementById('file-info').style.display = 'none';
-        document.getElementById('stats').style.display = 'none';
-        
-        this.disableButtons();
-        this.notificationManager.info('Content cleared');
+    // Add missing utility methods
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     getDownloadFilename(extension) {
@@ -603,18 +544,22 @@ export class SubtitleProcessor {
         return `subtitle_processed_${new Date().toISOString().slice(0, 10)}${extension}`;
     }
 
-    formatFileSize(bytes) {
-        if (bytes === 0) return '0 Bytes';
-        const k = 1024;
-        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
-        const i = Math.floor(Math.log(bytes) / Math.log(k));
-        return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
-    }
-
-    escapeHtml(text) {
-        const div = document.createElement('div');
-        div.textContent = text;
-        return div.innerHTML;
+    clearContent() {
+        this.currentFile = null;
+        this.processedContent = '';
+        this.processedText = '';
+        this.originalContent = '';
+        this.originalFilename = '';
+        this.stats = { lines: 0, characters: 0 };
+        
+        document.getElementById('output-text').value = '';
+        this.disableButtons();
+        
+        // Reset file input
+        const fileInput = document.querySelector('#file-input');
+        if (fileInput) {
+            fileInput.value = '';
+        }
     }
 
     destroy() {

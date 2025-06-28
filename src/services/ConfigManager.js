@@ -15,22 +15,22 @@ export class ConfigManager {
     getDefaultConfig() {
         return {
             subtitle: {
-                fontSize: 8, // Smaller default
+                fontSize: 8,
                 columns: 3,
                 fontFamily: 'calibri',
                 removeTimestamps: false,
                 removeLineNumbers: true,
                 // PDF-specific settings
                 pdfColumns: 3,
-                pdfFontSize: 8, // Much smaller for PDF
-                removeTimestampsInPDF: false, // Show timestamps by default
-                showTimestampsInPDF: true, // New explicit setting
+                pdfFontSize: 8,
+                removeTimestampsInPDF: false,
+                showTimestampsInPDF: true,
                 autoOptimize: true,
                 // Title settings
                 title: '',
                 showTitle: true,
-                titleFontSize: 14, // Smaller title
-                titleSpacing: 10, // Less spacing
+                titleFontSize: 14,
+                titleSpacing: 10,
                 // Vietnamese font settings
                 useImageRendering: true,
                 fontQuality: 2
@@ -71,7 +71,7 @@ export class ConfigManager {
         
         return {
             columns: Math.max(1, Math.min(4, pdfConfig.pdfColumns || 3)),
-            fontSize: Math.max(6, Math.min(12, pdfConfig.pdfFontSize || 8)), // Smaller range
+            fontSize: Math.max(6, Math.min(12, pdfConfig.pdfFontSize || 8)),
             removeTimestampsInPDF: Boolean(pdfConfig.removeTimestampsInPDF),
             showTimestampsInPDF: Boolean(pdfConfig.showTimestampsInPDF !== false),
             autoOptimize: Boolean(pdfConfig.autoOptimize !== false),
