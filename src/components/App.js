@@ -6,13 +6,30 @@ export class App {
     }
 
     mount(selector) {
-        this.container = document.querySelector(selector);
+        const container = document.querySelector(selector);
+        if (!container) {
+            throw new Error(`Container element not found: ${selector}`);
+        }
+        
+        this.container = container;
         this.render();
         this.bindEvents();
+        
+        console.log('✅ App mounted successfully');
     }
 
     render() {
         const tools = this.toolRegistry.getAll();
+        
+        if (tools.length === 0) {
+            this.container.innerHTML = `
+                <div style="padding: 40px; text-align: center; font-family: Inter, sans-serif;">
+                    <h1>Everything Tool</h1>
+                    <p style="color: #666;">No tools available</p>
+                </div>
+            `;
+            return;
+        }
         
         this.container.innerHTML = `
             <div class="container">
@@ -28,7 +45,10 @@ export class App {
             </div>
         `;
 
-        this.renderCurrentTool();
+        // Render current tool after DOM is ready
+        setTimeout(() => {
+            this.renderCurrentTool();
+        }, 0);
     }
 
     renderNavigation(tools) {
@@ -45,10 +65,35 @@ export class App {
     }
 
     renderCurrentTool() {
+        const toolContentElement = document.getElementById('tool-content');
+        if (!toolContentElement) {
+            console.error('Tool content element not found');
+            return;
+        }
+
         const toolClass = this.toolRegistry.get(this.currentToolId);
         if (toolClass) {
-            this.currentTool = new toolClass();
-            this.currentTool.mount('#tool-content');
+            try {
+                this.currentTool = new toolClass();
+                this.currentTool.mount('#tool-content');
+                console.log(`✅ Tool ${this.currentToolId} rendered successfully`);
+            } catch (error) {
+                console.error(`❌ Failed to render tool ${this.currentToolId}:`, error);
+                toolContentElement.innerHTML = `
+                    <div style="padding: 40px; text-align: center; color: #dc2626;">
+                        <h3>Tool Error</h3>
+                        <p>Failed to load ${this.currentToolId}: ${error.message}</p>
+                    </div>
+                `;
+            }
+        } else {
+            console.error(`Tool not found: ${this.currentToolId}`);
+            toolContentElement.innerHTML = `
+                <div style="padding: 40px; text-align: center; color: #dc2626;">
+                    <h3>Tool Not Found</h3>
+                    <p>Tool "${this.currentToolId}" is not registered</p>
+                </div>
+            `;
         }
     }
 

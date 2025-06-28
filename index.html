@@ -11,21 +11,64 @@
     <!-- Enhanced Vietnamese font support -->
     <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&family=Source+Sans+Pro:wght@400;600&display=swap" rel="stylesheet">
     <script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
-    <!-- jsPDF with better Unicode support -->
+    <!-- PDF Libraries -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
-    <!-- Optional: Add Vietnamese font to jsPDF -->
-    <script>
-        // Ensure proper UTF-8 handling
-        document.addEventListener('DOMContentLoaded', function() {
-            if (window.jspdf) {
-                // Configure jsPDF for better Vietnamese support
-                console.log('jsPDF loaded with Vietnamese support');
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+</head>
+<body>
+    <div id="app">
+        <!-- Loading indicator -->
+        <div id="loading" style="display: flex; justify-content: center; align-items: center; height: 100vh; font-family: Inter, sans-serif;">
+            <div style="text-align: center;">
+                <div style="width: 40px; height: 40px; border: 4px solid #f3f3f3; border-top: 4px solid #000; border-radius: 50%; animation: spin 1s linear infinite; margin: 0 auto 16px;"></div>
+                <div>Loading Everything Tool...</div>
+            </div>
+        </div>
+    </div>
+    
+    <style>
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+    </style>
+    
+    <script type="module">
+        // Simple approach - wait for DOM and libraries, then start app
+        document.addEventListener('DOMContentLoaded', async function() {
+            // Wait a bit for libraries to load
+            await new Promise(resolve => setTimeout(resolve, 500));
+            
+            try {
+                // Import and start the app
+                const { ToolRegistry } = await import('./src/services/ToolRegistry.js');
+                const { SubtitleProcessor } = await import('./src/tools/SubtitleProcessor.js');
+                const { App } = await import('./src/components/App.js');
+
+                // Initialize tool registry
+                const toolRegistry = new ToolRegistry();
+
+                // Register tools
+                toolRegistry.register('subtitle-processor', SubtitleProcessor);
+
+                // Initialize app
+                const app = new App(toolRegistry);
+                app.mount('#app');
+                
+                console.log('✅ Everything Tool loaded successfully');
+            } catch (error) {
+                console.error('❌ Failed to load app:', error);
+                document.getElementById('app').innerHTML = `
+                    <div style="padding: 40px; text-align: center; font-family: Inter, sans-serif;">
+                        <h1 style="color: #dc2626; margin-bottom: 16px;">Loading Error</h1>
+                        <p style="color: #666; margin-bottom: 24px;">Failed to load Everything Tool: ${error.message}</p>
+                        <button onclick="location.reload()" style="padding: 8px 16px; background: #000; color: #fff; border: none; border-radius: 4px; cursor: pointer;">
+                            Refresh Page
+                        </button>
+                    </div>
+                `;
             }
         });
     </script>
-</head>
-<body>
-    <div id="app"></div>
-    <script type="module" src="src/main.js"></script>
 </body>
 </html>
