@@ -26,14 +26,13 @@ export class SubtitleProcessor {
             <div class="subtitle-processor">
                 <div class="tool-header">
                     <h2>Subtitle Processor</h2>
-                    <p class="tool-description">Upload .srt or .txt files to clean and format subtitles</p>
                 </div>
 
                 <div id="file-upload-area" class="upload-section"></div>
 
                 <div class="output-section">
                     <div class="output-header">
-                        <h3>Output</h3>
+                        <h3></h3>
                         <div class="output-stats" id="output-stats" style="display: none;">
                             <span id="line-count">0 lines</span> • <span id="char-count">0 characters</span>
                         </div>

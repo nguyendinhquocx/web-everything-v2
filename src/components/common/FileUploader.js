@@ -43,7 +43,7 @@ export class FileUploader {
 
     getAcceptText() {
         if (this.options.accept === '.srt,.txt') {
-            return 'SRT or TXT files only';
+            return 'SRT or TXT';
         }
         return `Max size: ${Math.round(this.options.maxSize / 1024 / 1024)}MB`;
     }
